@@ -201,12 +201,14 @@ ORDER BY student_id;
  * Expected Output: Five courses with their instructor names, ordered by course ID.
  */
 
-SELECT c.course_code,
-       c.course_title,
-       i.full_name AS instructor_name
+SELECT
+    c.course_code,
+    c.title AS course_title,
+    i.name AS instructor_name
 FROM courses AS c
-JOIN instructors AS i ON c.instructor_id = i.instructor_id
-ORDER BY c.course_id;
+JOIN instructors AS i
+    ON c.instructor_id = i.id
+ORDER BY c.id;
 
 /*
  * +-------------+--------------------------------------------------+-------------------------+
