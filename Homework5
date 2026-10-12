@@ -2,8 +2,8 @@
  * Name: Hoàng Hòa Bình
  * Student ID: 23071307
  * Assignment: Homework 5 - Introduction to SQL
- * Date: 2026-10-11
- * Database: university_db from Homework 4
+ * Date: 2026-10-12
+ * Database: university_db from Homework 5
  * Expected outputs below use the original Homework 4 sample data.
  */
 
@@ -66,7 +66,7 @@ ORDER BY enrollment_id;
  * Query 3: WHERE with AND: Information Systems Courses
  * Description: Finds courses in department 1 (Information Systems) that carry at least 3 credits.
  * Both conditions must be true.
- * Expected Output: One course: IS301, Database Management Systems, with 3 credits in department 1.
+ * Expected Output: One course: IS301, Transmission of Information, with 3 credits in department 1.
  */
 
 SELECT course_code, course_title, credits, department_id
@@ -78,7 +78,7 @@ ORDER BY course_code;
  * +-------------+-----------------------------+---------+---------------+
  * | course_code | course_title                | credits | department_id |
  * +-------------+-----------------------------+---------+---------------+
- * | IS301       | Database Management Systems | 3       | 1             |
+ * | IS301       | Transmission of Information | 3       | 1             |
  * +-------------+-----------------------------+---------+---------------+
  * (1 rows)
  */
@@ -97,11 +97,11 @@ ORDER BY student_code DESC;
  * +--------------+--------------------+
  * | student_code | full_name          |
  * +--------------+--------------------+
- * | STU005       | Cao Hoàng Anh    |
- * | STU004       | Hoàng Hòa Bình      |
- * | STU003       | Phạm Tùng Dương       |
- * | STU002       | Nguyễn Long Vũ      |
- * | STU001       | Nguyễn Tiến Đạt |
+ * | STU005       | Cao Hoàng Anh      |
+ * | STU004       | Hoàng Hòa Bình     |
+ * | STU003       | Phạm Tùng Dương    |
+ * | STU002       | Nguyễn Long Vũ     |
+ * | STU001       | Nguyễn Tiến Đạt    |
  * +--------------+--------------------+
  * (5 rows)
  */
@@ -132,21 +132,21 @@ LIMIT 3;
 
 /*
  * Query 6: LIKE: Introductory Courses
- * Description: Searches for course titles containing Introduction anywhere in the text.
+ * Description: Searches for course titles containing Systems anywhere in the text.
  * The percent signs match any sequence of characters.
- * Expected Output: One course: CS101, Introduction to Programming, with 3 credits.
+ * Expected Output: One course: ENG101, Embedded Systems and Microcontrollers, with 3 credits.
  */
 
 SELECT course_code, course_title, credits
 FROM courses
-WHERE course_title LIKE '%Introduction%'
+WHERE course_title LIKE '%Systems%'
 ORDER BY course_code;
 
 /*
  * +-------------+-----------------------------+---------+
  * | course_code | course_title                | credits |
  * +-------------+-----------------------------+---------+
- * | CS101       | Introduction to Programming | 3       |
+ * | ENG101      | Embedded Systems and Microcontrollers | 3       |
  * +-------------+-----------------------------+---------+
  * (1 rows)
  */
@@ -209,15 +209,15 @@ JOIN instructors AS i ON c.instructor_id = i.instructor_id
 ORDER BY c.course_id;
 
 /*
- * +-------------+-----------------------------+-----------------+
- * | course_code | course_title                | instructor_name |
- * +-------------+-----------------------------+-----------------+
- * | IS301       | Database Management Systems | Nguyễn Văn Hùng |
- * | CS101       | Introduction to Programming | Trần Thị Lan    |
- * | BA201       | Principles of Management    | Lê Minh Tuấn    |
- * | AF101       | Financial Accounting        | Phạm Thu Hà     |
- * | ENG101      | Academic English            | Hoàng Thị Hương |
- * +-------------+-----------------------------+-----------------+
+ * +-------------+--------------------------------------------------+-------------------------+
+ * | course_code | course_title                                     | instructor_name         |
+ * +-------------+--------------------------------------------------+-------------------------+
+ * | IS301       | Transmission of Information                      | TS Đinh Văn Linh        |
+ * | CS101       | Simulation of Digital Circuits                   | TS Phạm Thị Việt Hương  |
+ * | BA201       | Computer Vision                                  | TS Kim Đình Thái        |
+ * | AF101       | Networks and Telecommunications                  | TS Nguyễn Ngọc Tân      |
+ * | ENG101      | Embedded Systems and Microcontrollers            | TS Dương Quang Khánh    |
+ * +-------------+--------------------------------------------------+-------------------------+
  * (5 rows)
  */
 
@@ -241,22 +241,22 @@ JOIN semesters AS sem ON e.semester_id = sem.semester_id
 ORDER BY e.enrollment_id;
 
 /*
- * +---------------+--------------------+-----------------------------+---------------+-------+
- * | enrollment_id | student_name       | course_title                | semester_name | grade |
- * +---------------+--------------------+-----------------------------+---------------+-------+
- * | 1             | Nguyễn Tiến Đạt | Database Management Systems | Fall 2024     | 3.50  |
- * | 2             | Nguyễn Tiến Đạt | Introduction to Programming | Fall 2024     | 3.70  |
- * | 3             | Nguyễn Long Vũ      | Introduction to Programming | Fall 2024     | 3.20  |
- * | 4             | Nguyễn Long Vũ      | Database Management Systems | Spring 2025   | 3.40  |
- * | 5             | Phạm Tùng Dương       | Principles of Management    | Fall 2024     | 3.80  |
- * | 6             | Phạm Tùng Dương       | Academic English            | Spring 2025   | 3.60  |
- * | 7             | Cao Hoàng Anh      | Financial Accounting        | Spring 2025   | 3.00  |
- * | 8             | Cao Hoàng Anh      | Principles of Management    | Summer 2025   | 3.30  |
- * | 9             | Cao Hoàng Anh    | Academic English            | Fall 2024     | 4.00  |
- * | 10            | Cao Hoàng Anh    | Principles of Management    | Fall 2025     | 3.50  |
- * | 11            | Nguyễn Tiến Đạt | Financial Accounting        | Spring 2026   | NULL  |
- * | 12            | Nguyễn Long Vũ      | Academic English            | Spring 2026   | NULL  |
- * +---------------+--------------------+-----------------------------+---------------+-------+
+ * +---------------+-----------------------+----------------------------------------+---------------+-------+
+ * | enrollment_id | student_name          | course_title                           | semester_name | grade |
+ * +---------------+-----------------------+----------------------------------------+---------------+-------+
+ * | 1             | Nguyễn Tiến Đạt       | Transmission of Information            | Fall 2024     | 3.50  |
+ * | 2             | Nguyễn Tiến Đạt       | Simulation of Digital Circuits         | Fall 2024     | 3.70  |
+ * | 3             | Nguyễn Long Vũ        | Simulation of Digital Circuits         | Fall 2024     | 3.20  |
+ * | 4             | Nguyễn Long Vũ        | Transmission of Information            | Spring 2025   | 3.40  |
+ * | 5             | Phạm Tùng Dương       | Computer Vision                        | Fall 2024     | 3.80  |
+ * | 6             | Phạm Tùng Dương       | Embedded Systems and Microcontrollers  | Spring 2025   | 3.60  |
+ * | 7             | Cao Hoàng Anh         | Networks and Telecommunications        | Spring 2025   | 3.00  |
+ * | 8             | Cao Hoàng Anh         | Computer Vision                        | Summer 2025   | 3.30  |
+ * | 9             | Cao Hoàng Anh         | Embedded Systems and Microcontrollers  | Fall 2024     | 4.00  |
+ * | 10            | Cao Hoàng Anh         | Computer Vision                        | Fall 2025     | 3.50  |
+ * | 11            | Nguyễn Tiến Đạt       | Networks and Telecommunications        | Spring 2026   | NULL  |
+ * | 12            | Nguyễn Long Vũ        | Embedded Systems and Microcontrollers  | Spring 2026   | NULL  |
+ * +---------------+-----------------------+----------------------------------------+---------------+-------+
  * (12 rows)
  */
 
