@@ -1,0 +1,133 @@
+<?php
+session_start();
+
+function escapeHtml(string $value): string {
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+$step = $_GET['step'] ?? 'register';
+$validSteps = ['register', 'survey', 'summary'];
+if (!in_array($step, $validSteps, true)) $step = 'register';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['start_over'])) {
+    $_SESSION = [];
+    session_destroy();
+    header('Location: homework3.php?step=register');
+    exit;
+}
+
+// Survey and summary require the registration step to be completed.
+if (in_array($step, ['survey', 'summary'], true) && (!isset($_SESSION['registration']) || !is_array($_SESSION['registration']))) {
+    header('Location: homework3.php?step=register');
+    exit;
+}
+if ($step === 'summary' && (!isset($_SESSION['survey']) || !is_array($_SESSION['survey']))) {
+    header('Location: homework3.php?step=survey');
+    exit;
+}
+
+$errors = [];
+$registrationValues = ['name' => '', 'email' => '', 'age' => '', 'gender' => ''];
+$languages = ['PHP', 'JavaScript', 'Python', 'Java', 'C++', 'Other'];
+$experiences = ['Beginner', 'Intermediate', 'Advanced'];
+$interestOptions = ['Web Development', 'Mobile Apps', 'Data Science', 'Cybersecurity', 'AI/ML', 'Game Development'];
+$surveyValues = ['language' => '', 'experience' => '', 'interests' => []];
+
+if ($step === 'register' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    foreach (array_keys($registrationValues) as $field) {
+        $posted = $_POST[$field] ?? '';
+        $registrationValues[$field] = is_string($posted) ? trim($posted) : '';
+    }
+    $passwordInput = $_POST['password'] ?? '';
+    $password = is_string($passwordInput) ? $passwordInput : '';
+    $confirmInput = $_POST['confirm_password'] ?? '';
+    $confirmPassword = is_string($confirmInput) ? $confirmInput : '';
+
+    if ($registrationValues['name'] === '') $errors['name'] = 'Please enter your full name.';
+    if ($registrationValues['email'] === '') $errors['email'] = 'Please enter your email address.';
+    elseif (!filter_var($registrationValues['email'], FILTER_VALIDATE_EMAIL)) $errors['email'] = 'Please enter a valid email address.';
+    $passwordLength = preg_match_all('/./us', $password);
+    if ($passwordLength === false || $passwordLength < 6) $errors['password'] = 'Password must contain at least 6 characters.';
+    if ($confirmPassword !== $password) $errors['confirm_password'] = 'The passwords do not match.';
+    $age = filter_var($registrationValues['age'], FILTER_VALIDATE_INT);
+    if ($registrationValues['age'] === '' || $age === false || $age < 10 || $age > 100) $errors['age'] = 'Age must be a whole number from 10 to 100.';
+    if (!in_array($registrationValues['gender'], ['Male', 'Female', 'Other'], true)) $errors['gender'] = 'Please select a gender.';
+
+    if ($errors === []) {
+        $_SESSION['registration'] = [
+            'name' => $registrationValues['name'],
+            'email' => $registrationValues['email'],
+            'age' => $age,
+            'gender' => $registrationValues['gender'],
+        ];
+        unset($_SESSION['survey']);
+        header('Location: homework3.php?step=survey');
+        exit;
+    }
+}
+
+if ($step === 'survey') {
+    $savedSurvey = $_SESSION['survey'] ?? [];
+    $surveyValues = [
+        'language' => is_string($savedSurvey['language'] ?? null) ? $savedSurvey['language'] : '',
+        'experience' => is_string($savedSurvey['experience'] ?? null) ? $savedSurvey['experience'] : '',
+        'interests' => is_array($savedSurvey['interests'] ?? null) ? $savedSurvey['interests'] : [],
+    ];
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $language = $_POST['language'] ?? '';
+        $experience = $_POST['experience'] ?? '';
+        $interests = $_POST['interests'] ?? [];
+        $surveyValues['language'] = is_string($language) ? $language : '';
+        $surveyValues['experience'] = is_string($experience) ? $experience : '';
+        if (!is_array($interests)) $interests = [];
+        $interests = array_values(array_filter($interests, 'is_string'));
+        $surveyValues['interests'] = array_values(array_intersect($interestOptions, $interests));
+
+        if (!in_array($surveyValues['language'], $languages, true)) $errors['language'] = 'Please choose a programming language.';
+        if (!in_array($surveyValues['experience'], $experiences, true)) $errors['experience'] = 'Please select your experience level.';
+        if ($surveyValues['interests'] === []) $errors['interests'] = 'Select at least one interest.';
+        if ($errors === []) {
+            $_SESSION['survey'] = $surveyValues;
+            header('Location: homework3.php?step=summary');
+            exit;
+        }
+    }
+}
+
+$registration = $_SESSION['registration'] ?? [];
+$survey = $_SESSION['survey'] ?? [];
+$summaryInterests = is_array($survey['interests'] ?? null) ? $survey['interests'] : [];
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><?php echo $step === 'register' ? 'Registration' : ($step === 'survey' ? 'Programming Survey' : 'Registration Summary'); ?> | Homework 3</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#20312e;background:#f2f6f4}*{box-sizing:border-box}body{margin:0;padding:36px 16px}main{width:min(100%,720px);margin:0 auto}.eyebrow{margin:0 0 8px;color:#39776b;font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}h1{margin:0;color:#174f45;font-size:2rem}.intro{margin:10px 0 24px;color:#5d6d68;line-height:1.55}.panel{padding:26px;border:1px solid #d7e3df;border-radius:8px;background:#fff;box-shadow:0 12px 32px #183d3210}.progress{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;color:#6a7975;font-size:.84rem}.progress span{padding:7px 11px;border:1px solid #d9e2df;border-radius:4px}.progress .active{border-color:#24695b;background:#e8f3ef;color:#174f45;font-weight:700}.field{margin:0 0 19px}label,legend{display:block;margin-bottom:8px;font-size:.95rem;font-weight:700}input[type=text],input[type=email],input[type=password],input[type=number],select{width:100%;min-height:43px;padding:9px 11px;border:1px solid #bdcbc6;border-radius:4px;background:#fff;color:#20312e;font:inherit}input:focus,select:focus{outline:3px solid #a8d5c7;border-color:#24695b}fieldset{margin:0;padding:0;border:0}.choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.choices label{display:flex;align-items:center;gap:9px;margin:0;padding:11px;border:1px solid #d7e3df;border-radius:4px;font-weight:400;cursor:pointer}.choices input{accent-color:#24695b}.error{display:block;margin-top:6px;color:#b42318;font-size:.86rem}.has-error input{border-color:#b42318}button{min-height:44px;margin-top:8px;padding:0 18px;border:0;border-radius:4px;background:#175b4e;color:#fff;font:inherit;font-weight:700;cursor:pointer}button:hover{background:#10483e}h2{margin:24px 0 10px;color:#174f45;font-size:1.05rem}dl{margin:0}.detail{display:grid;grid-template-columns:minmax(130px,1fr) 2fr;gap:12px;padding:12px 0;border-bottom:1px solid #e5ece9}.detail dt{color:#5d6d68}.detail dd{margin:0;overflow-wrap:anywhere;font-weight:700}.welcome{margin:0 0 22px;padding:16px;border-left:4px solid #2c806e;background:#eef7f3;color:#174f45;font-size:1.05rem}.interest-list{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}.interest-list li{padding:8px 10px;border:1px solid #c9ded6;border-radius:4px;background:#f1f8f5;color:#205c4e;font-size:.9rem}.secondary{border:1px solid #175b4e;background:#fff;color:#175b4e}.secondary:hover{background:#e8f3ef}@media(max-width:520px){body{padding:24px 12px}.panel{padding:19px}h1{font-size:1.65rem}.choices{grid-template-columns:1fr}.detail{grid-template-columns:1fr;gap:4px}}
+</style>
+</head>
+<body><main>
+<p class="eyebrow">Homework 3 · Registration Workflow</p>
+<?php if ($step === 'register'): ?>
+<h1>Create your registration</h1><p class="intro">Enter your details to continue to the programming survey.</p><div class="panel">
+<div class="progress"><span class="active">01 · Register</span><span>02 · Survey</span><span>03 · Summary</span></div>
+<form action="homework3.php?step=register" method="post" novalidate>
+<?php foreach ([['name','Full Name','text'],['email','Email','email'],['password','Password','password'],['confirm_password','Confirm Password','password'],['age','Age','number']] as [$id,$label,$type]): $value = $registrationValues[$id] ?? ''; ?>
+<div class="field <?php echo isset($errors[$id]) ? 'has-error' : ''; ?>"><label for="<?php echo $id; ?>"><?php echo $label; ?></label><input id="<?php echo $id; ?>" name="<?php echo $id; ?>" type="<?php echo $type; ?>" <?php if ($id !== 'password' && $id !== 'confirm_password') echo 'value="'.escapeHtml($value).'"'; ?> <?php if ($id === 'age') echo 'min="10" max="100" step="1"'; ?> <?php if ($id === 'password' || $id === 'confirm_password') echo 'minlength="6"'; ?> required><?php if (isset($errors[$id])): ?><span class="error"><?php echo escapeHtml($errors[$id]); ?></span><?php endif; ?></div>
+<?php endforeach; ?>
+<fieldset class="field"><legend>Gender</legend><div class="choices" style="grid-template-columns:repeat(3,minmax(0,1fr))"><?php foreach (['Male','Female','Other'] as $gender): ?><label><input type="radio" name="gender" value="<?php echo $gender; ?>" <?php echo $registrationValues['gender'] === $gender ? 'checked' : ''; ?> required> <?php echo $gender; ?></label><?php endforeach; ?></div><?php if (isset($errors['gender'])): ?><span class="error"><?php echo escapeHtml($errors['gender']); ?></span><?php endif; ?></fieldset>
+<button type="submit">Continue to survey</button></form></div>
+<?php elseif ($step === 'survey'): ?>
+<h1>Your programming survey</h1><p class="intro">A few quick choices help us learn what you enjoy building.</p><div class="panel"><div class="progress"><span>01 · Register</span><span class="active">02 · Survey</span><span>03 · Summary</span></div>
+<form action="homework3.php?step=survey" method="post"><div class="field"><label for="language">Favorite Programming Language</label><select id="language" name="language" required><option value="">Choose a language</option><?php foreach ($languages as $language): ?><option value="<?php echo escapeHtml($language); ?>" <?php echo $surveyValues['language'] === $language ? 'selected' : ''; ?>><?php echo escapeHtml($language); ?></option><?php endforeach; ?></select><?php if (isset($errors['language'])): ?><span class="error"><?php echo escapeHtml($errors['language']); ?></span><?php endif; ?></div>
+<fieldset class="field"><legend>Experience Level</legend><div class="choices"><?php foreach ($experiences as $experience): ?><label><input type="radio" name="experience" value="<?php echo escapeHtml($experience); ?>" <?php echo $surveyValues['experience'] === $experience ? 'checked' : ''; ?> required> <?php echo escapeHtml($experience); ?></label><?php endforeach; ?></div><?php if (isset($errors['experience'])): ?><span class="error"><?php echo escapeHtml($errors['experience']); ?></span><?php endif; ?></fieldset>
+<fieldset class="field"><legend>Interests (choose at least one)</legend><div class="choices"><?php foreach ($interestOptions as $interest): ?><label><input type="checkbox" name="interests[]" value="<?php echo escapeHtml($interest); ?>" <?php echo in_array($interest, $surveyValues['interests'], true) ? 'checked' : ''; ?>> <?php echo escapeHtml($interest); ?></label><?php endforeach; ?></div><?php if (isset($errors['interests'])): ?><span class="error"><?php echo escapeHtml($errors['interests']); ?></span><?php endif; ?></fieldset><button type="submit">View my summary</button></form></div>
+<?php else: ?>
+<h1>Registration complete</h1><p class="intro">Your registration and survey responses are together below.</p><div class="panel"><div class="progress"><span>01 · Register</span><span>02 · Survey</span><span class="active">03 · Summary</span></div><p class="welcome">Thank you, <?php echo escapeHtml((string)($registration['name'] ?? '')); ?>. Your response has been recorded.</p>
+<h2>Registration</h2><dl><?php foreach (['Full Name'=>'name','Email'=>'email','Age'=>'age','Gender'=>'gender'] as $label=>$key): ?><div class="detail"><dt><?php echo $label; ?></dt><dd><?php echo escapeHtml((string)($registration[$key] ?? '')); ?></dd></div><?php endforeach; ?></dl>
+<h2>Survey responses</h2><dl><div class="detail"><dt>Favorite Language</dt><dd><?php echo escapeHtml((string)($survey['language'] ?? '')); ?></dd></div><div class="detail"><dt>Experience Level</dt><dd><?php echo escapeHtml((string)($survey['experience'] ?? '')); ?></dd></div></dl>
+<h2>Interests</h2><ul class="interest-list"><?php foreach ($summaryInterests as $interest): ?><li><?php echo escapeHtml((string)$interest); ?></li><?php endforeach; ?></ul><form action="homework3.php?step=summary" method="post"><button class="secondary" type="submit" name="start_over" value="1">Start Over</button></form></div>
+<?php endif; ?>
+</main></body></html>
