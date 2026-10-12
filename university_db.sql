@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- ASSIGNMENT: Homework 4 - Introduction to MySQL (INS3064)
--- STUDENT NAME: [Điền Họ và Tên của bạn]
--- STUDENT ID: [Điền Mã Sinh Viên của bạn]
+-- STUDENT NAME: Hoàng Hòa Bình
+-- STUDENT ID: 23071307
 -- DATE: 2026-10-05
 -- FILE: university_db.sql
 -- DESCRIPTION: Full relational database schema and seed data for University Course Registration System.
@@ -116,27 +116,27 @@ INSERT INTO departments (id, name, code) VALUES
 
 -- Seed 2: instructors (5 records)
 INSERT INTO instructors (id, department_id, name, email, phone, hire_date) VALUES
-(1, 1, 'Nguyễn Văn An', 'an.nguyen@university.edu.vn', '0901234567', '2015-09-01'),
-(2, 2, 'Trần Thị Bình', 'binh.tran@university.edu.vn', '0912345678', '2018-02-15'),
-(3, 3, 'Lê Hoàng Cường', 'cuong.le@university.edu.vn', '0923456789', '2012-11-20'),
-(4, 4, 'Phạm Hải Yến', 'yen.pham@university.edu.vn', '0934567890', '2020-08-01'),
-(5, 5, 'Đỗ Minh Đức', 'duc.do@university.edu.vn', '0945678901', '2016-04-10');
+(1, 1, 'TS Đinh Văn Linh', 'linh.dinh@university.edu.vn', '0901234567', '2015-09-01'),
+(2, 2, 'TS Phạm Thị Việt Hương', 'huong.pham@university.edu.vn', '0912345678', '2018-02-15'),
+(3, 3, 'TS Kim Đình Thái', 'thai.kim@university.edu.vn', '0923456789', '2012-11-20'),
+(4, 4, 'TS Nguyễn Ngọc Tân', 'tan.nguyen@university.edu.vn', '0934567890', '2020-08-01'),
+(5, 5, 'TS Dương Quang Khánh', 'khanh.duong@university.edu.vn', '0945678901', '2016-04-10');
 
 -- Seed 3: students (5 records)
 INSERT INTO students (id, department_id, student_code, name, email, gender, gpa) VALUES
-(1, 2, 'SV2024001', 'Nguyễn Minh Khoa', 'khoa.sv2024001@st.university.edu.vn', 'Male', 3.65),
-(2, 2, 'SV2024002', 'Lê Thu Hà', 'ha.sv2024002@st.university.edu.vn', 'Female', 3.80),
-(3, 1, 'SV2024003', 'Trần Tuấn Kiệt', 'kiet.sv2024003@st.university.edu.vn', 'Male', 3.20),
-(4, 3, 'SV2024004', 'Vũ Ngọc Ánh', 'anh.sv2024004@st.university.edu.vn', 'Female', 2.95),
-(5, 5, 'SV2024005', 'Hoàng Quốc Bảo', 'bao.sv2024005@st.university.edu.vn', 'Male', 3.40);
+(1, 2, 'SV2024001', 'Hoàng Hòa Bình', 'binh.hoang2024001@st.university.edu.vn', 'Male', 3.65),
+(2, 2, 'SV2024002', 'Nguyễn Tiến Đạt', 'dat.nguyen2024002@st.university.edu.vn', 'Male', 3.80),
+(3, 1, 'SV2024003', 'Cao Hoàng Anh', 'anh.cao2024003@st.university.edu.vn', 'Male', 3.20),
+(4, 3, 'SV2024004', 'Lê Minh Dương', 'duong.le2024004@st.university.edu.vn', 'Male', 2.95),
+(5, 5, 'SV2024005', 'Đỗ Hữu Hiệp', 'hiep.do2024005@st.university.edu.vn', 'Male', 3.40);
 
 -- Seed 4: courses (5 records)
 INSERT INTO courses (id, department_id, instructor_id, course_code, title, credits, description) VALUES
-(1, 1, 1, 'INS3064', 'Web Development & MySQL', 3, 'Nhập môn phát triển Web và cơ sở dữ liệu MySQL'),
-(2, 2, 2, 'MMD2010', 'Thiết kế Đồ họa Đa phương tiện', 3, 'Kỹ thuật thiết kế giao diện UI/UX và đồ họa số'),
-(3, 3, 3, 'BUS1001', 'Quản trị Học Cơ bản', 2, 'Các nguyên lý cơ bản trong quản trị doanh nghiệp'),
-(4, 4, 4, 'ENG2002', 'Tiếng Anh Chuyên ngành CNTT', 2, 'Cung cấp từ vựng và kỹ năng giao tiếp tiếng Anh chuyên ngành'),
-(5, 5, 5, 'ECE3005', 'Mạng Máy tính Cơ bản', 3, 'Kiến trúc mạng, giao thức TCP/IP và cấu hình thiết bị');
+(1, 1, 1, 'INS3141', 'Transmission of Information', 3, 'Transmission of Information'),
+(2, 2, 2, 'INS3135', 'Simulation of Digital Circuits', 3, 'Simulation of Digital Circuits'),
+(3, 3, 3, 'INS3155', 'Computer Vision', 3, 'Computer Vision'),
+(4, 4, 4, 'INS3109', 'Networks and Telecommunications', 3, 'Networks and Telecommunications'),
+(5, 5, 5, 'INS3181', 'Embedded Systems and Microcontrollers', 3, 'Embedded Systems and Microcontrollers');
 
 -- Seed 5: semesters (5 records)
 INSERT INTO semesters (id, semester_name, start_date, end_date) VALUES
