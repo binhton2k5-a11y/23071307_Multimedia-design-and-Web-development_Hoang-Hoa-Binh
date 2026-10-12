@@ -1,0 +1,262 @@
+<?php
+$students = [
+    ['name' => 'Hoàng Hòa Bình', 'scores' => [8.5, 9.2, 7.8, 9.0]],
+    ['name' => 'Nguyễn Tiến Đạt', 'scores' => [7.0, 6.5, 8.0, 7.2]],
+    ['name' => 'Cao Hoàng Anh', 'scores' => [6.3, 6.3, 6.3, 6.3]],
+    ['name' => 'Lê Minh Dương', 'scores' => [1.0, 2.0, 1.0, 2.0]],
+    ['name' => 'Đỗ Hữu Hiệp', 'scores' => [10.0, 10.0, 10.0, 10.0]],
+];
+
+$courses = [
+    [
+        'code' => 'INS3141',
+        'name' => 'Transmission of Information',
+        'teacher' => 'TS Đinh Văn Linh',
+    ],
+    [
+        'code' => 'INS3135',
+        'name' => 'Simulation of Digital Circuits',
+        'teacher' => 'TS Phạm Thị Việt Hương',
+    ],
+    [
+        'code' => 'INS3155',
+        'name' => 'Computer Vision',
+        'teacher' => 'TS Kim Đình Thái',
+    ],
+    [
+        'code' => 'INS3109',
+        'name' => 'Networks and Telecommunications',
+        'teacher' => 'TS Nguyễn Ngọc Tân',
+    ],
+    [
+        'code' => 'INS3181',
+        'name' => 'Embedded Systems and Microcontrollers',
+        'teacher' => 'TS Dương Quang Khánh',
+    ],
+];
+
+function calculateAverage(array $scores): float
+{
+    $scoreCount = count($scores);
+
+    if ($scoreCount === 0) {
+        return 0.0;
+    }
+
+    $total = 0;
+    for ($index = 0; $index < $scoreCount; $index++) {
+        $total += $scores[$index];
+    }
+
+    return round($total / $scoreCount, 1);
+}
+
+function assignGrade(float $average): string
+{
+    if ($average >= 9) {
+        return 'A';
+    } elseif ($average >= 8) {
+        return 'B';
+    } elseif ($average >= 7) {
+        return 'C';
+    } elseif ($average >= 6) {
+        return 'D';
+    } else {
+        return 'F';
+    }
+}
+
+function gradeClass(string $grade): string
+{
+    return 'grade-' . strtolower($grade);
+}
+
+function escapeHtml(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+$results = [];
+foreach ($students as $originalIndex => $student) {
+    $scores = $student['scores'];
+    $average = calculateAverage($scores);
+
+    $results[] = [
+        'name' => $student['name'],
+        'scores' => $scores,
+        'average' => $average,
+        'highest' => count($scores) > 0 ? max($scores) : 0,
+        'lowest' => count($scores) > 0 ? min($scores) : 0,
+        'grade' => assignGrade($average),
+        'original_index' => $originalIndex,
+    ];
+}
+
+usort($results, function (array $firstStudent, array $secondStudent): int {
+    if ($firstStudent['average'] === $secondStudent['average']) {
+        return $firstStudent['original_index'] <=> $secondStudent['original_index'];
+    }
+
+    return $secondStudent['average'] <=> $firstStudent['average'];
+});
+?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý sinh viên và môn học</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Arial, sans-serif;
+            background: #f4f7f6;
+            color: #202b2a;
+        }
+
+        body {
+            margin: 0;
+            padding: 32px 18px;
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            color: #145a50;
+        }
+
+        .subtitle {
+            margin: 0 0 24px;
+            color: #52615e;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid #d5dfdc;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th,
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e3e9e7;
+            white-space: nowrap;
+        }
+
+        th {
+            background: #145a50;
+            color: #fff;
+            font-size: 0.9rem;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f7faf9;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .numeric {
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .grade {
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .grade-a { color: #137333; }
+        .grade-b { color: #1769aa; }
+        .grade-c { color: #8a6100; }
+        .grade-d { color: #b54708; }
+        .grade-f { color: #b42318; }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 24px 12px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            th,
+            td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Quản lý sinh viên và môn học</h1>
+        <p class="subtitle">Bảng điểm của 5 sinh viên. Điểm được tính trên thang 10: A ≥ 9, B ≥ 8, C ≥ 7, D ≥ 6, còn lại là F.</p>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Rank</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Scores (/10)</th>
+                        <th scope="col">Average (/10)</th>
+                        <th scope="col">Highest (/10)</th>
+                        <th scope="col">Lowest (/10)</th>
+                        <th scope="col">Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($results as $rank => $student): ?>
+                        <tr>
+                            <td class="numeric"><?php echo $rank + 1; ?></td>
+                            <td><?php echo escapeHtml($student['name']); ?></td>
+                            <td><?php echo escapeHtml(implode(', ', $student['scores'])); ?></td>
+                            <td class="numeric"><?php echo number_format($student['average'], 1); ?></td>
+                            <td class="numeric"><?php echo number_format($student['highest'], 1); ?></td>
+                            <td class="numeric"><?php echo number_format($student['lowest'], 1); ?></td>
+                            <td class="grade <?php echo escapeHtml(gradeClass($student['grade'])); ?>">
+                                <?php echo escapeHtml($student['grade']); ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <h2 style="margin-top: 32px; color: #145a50;">Danh sách môn học và giảng viên</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Mã môn học</th>
+                        <th scope="col">Tên môn học</th>
+                        <th scope="col">Giảng viên</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($courses as $course): ?>
+                        <tr>
+                            <td><?php echo escapeHtml($course['code']); ?></td>
+                            <td><?php echo escapeHtml($course['name']); ?></td>
+                            <td><?php echo escapeHtml($course['teacher']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
