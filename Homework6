@@ -1,318 +1,575 @@
-# Homework 6 — Online Bookstore ERD
-
-**Students:** Hoàng Hòa Bình
-**Date:** 2026-10-18  
-**Database:** `bookstore_db`  
-**Matching implementation:** `bookstore_db.sql`
-
-## 1. Relationship overview (text ERD)
-
-`1` = exactly one; `0..1` = optional one; `0..N` = zero or many.
-A child FK row always points to one parent unless the FK is explicitly nullable.
-
-```text
-publishers (1) -------- (0..N) books
-
-books (1) ------------ (0..N) book_authors (0..N) ------------ (1) authors
-         books <---------------- M:N ----------------> authors
-
-books (1) ------------ (0..N) book_categories (0..N) --------- (1) categories
-         books <---------------- M:N ----------------> categories
-
-categories [parent] (0..1) ---- (0..N) categories [child]
-                             parent_category_id
-
-customers (1) -------- (0..N) orders
-orders (1) ----------- (0..N) order_items (0..N) ------------- (1) books
-         orders <--------------- M:N ----------------> books
-
-customers (1) -------- (0..N) reviews (0..N) ----------------- (1) books
-```
-
-A book may have multiple authors and multiple categories; neither is encoded as
-a list in a single column. A catalog draft may initially have no associations;
-all sample books have at least one author and one category. Each junction row
-contains exactly one valid key from each endpoint. The two junction PKs prohibit
-duplicates. `order_items` additionally records quantity and the sale price.
-There is no 1:1 relationship required by this design.
-
-## 2. Complete entities and attributes
-
-**PK** = primary key; **FK** = foreign key; **UQ** = unique candidate key; **AI** = auto-increment.
-A composite PK is the combination of the marked fields, not each field separately.
-All columns are NOT NULL except those explicitly marked nullable below.
-
-### `authors`
-
-One row per author; names are not assumed to be unique.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `author_id` | `INT UNSIGNED` | PK, AI | NOT NULL |
-| `full_name` | `VARCHAR(120)` | — | NOT NULL |
-| `biography` | `TEXT` | — | Nullable |
-| `nationality` | `VARCHAR(60)` | — | NOT NULL |
-
-### `publishers`
-
-Publisher details are stored once and referenced by books.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `publisher_id` | `INT UNSIGNED` | PK, AI | NOT NULL |
-| `publisher_name` | `VARCHAR(150)` | UQ | NOT NULL |
-| `address_line` | `VARCHAR(200)` | — | NOT NULL |
-| `city` | `VARCHAR(80)` | — | NOT NULL |
-| `country` | `VARCHAR(80)` | — | NOT NULL; default 'Vietnam' |
-| `website` | `VARCHAR(255)` | — | Nullable |
-
-### `categories`
-
-Optional parent_category_id represents sub-genres; NULL means a root category.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `category_id` | `INT UNSIGNED` | PK, AI | NOT NULL |
-| `category_name` | `VARCHAR(80)` | UQ | NOT NULL |
-| `description` | `TEXT` | — | Nullable |
-| `parent_category_id` | `INT UNSIGNED` | FK → `categories.category_id` | Nullable |
-
-### `books`
-
-One catalog row per ISBN/edition; the catalog price is the current price in VND.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `book_id` | `INT UNSIGNED` | PK, AI | NOT NULL |
-| `isbn` | `VARCHAR(13)` | UQ | NOT NULL |
-| `title` | `VARCHAR(200)` | — | NOT NULL |
-| `publisher_id` | `INT UNSIGNED` | FK → `publishers.publisher_id` | NOT NULL |
-| `price` | `DECIMAL(12,2)` | — | NOT NULL; current catalog price, VND |
-| `stock` | `INT` | — | NOT NULL; default 0 |
-| `publication_date` | `DATE` | — | NOT NULL |
-| `description` | `TEXT` | — | Nullable |
-
-### `book_authors`
-
-Resolves books M:N authors. The composite PK prevents duplicate associations.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `book_id` | `INT UNSIGNED` | PK, FK → `books.book_id` | NOT NULL |
-| `author_id` | `INT UNSIGNED` | PK, FK → `authors.author_id` | NOT NULL |
-
-Composite primary key: `(book_id, author_id)`.
-
-### `book_categories`
-
-Resolves books M:N categories. The composite PK prevents duplicate associations.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `book_id` | `INT UNSIGNED` | PK, FK → `books.book_id` | NOT NULL |
-| `category_id` | `INT UNSIGNED` | PK, FK → `categories.category_id` | NOT NULL |
-
-Composite primary key: `(book_id, category_id)`.
-
-### `customers`
-
-Customer profile and password hash; no plaintext password is stored.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `customer_id` | `INT UNSIGNED` | PK, AI | NOT NULL |
-| `full_name` | `VARCHAR(120)` | — | NOT NULL |
-| `email` | `VARCHAR(150)` | UQ | NOT NULL |
-| `password_hash` | `VARCHAR(255)` | — | NOT NULL; salted PBKDF2-SHA256, never plaintext |
-| `address_line` | `VARCHAR(200)` | — | NOT NULL |
-| `city` | `VARCHAR(80)` | — | NOT NULL |
-| `country` | `VARCHAR(80)` | — | NOT NULL; default 'Vietnam' |
-| `created_at` | `DATETIME` | — | NOT NULL; default CURRENT_TIMESTAMP |
-
-### `orders`
-
-Order header. Shipping fields are a snapshot of this order destination, not the current customer address.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `order_id` | `INT UNSIGNED` | PK, AI | NOT NULL |
-| `customer_id` | `INT UNSIGNED` | FK → `customers.customer_id` | NOT NULL |
-| `order_date` | `DATETIME` | — | NOT NULL; default CURRENT_TIMESTAMP |
-| `status` | `ENUM('pending', 'paid', 'shipped', 'delivered', 'cancelled')` | — | NOT NULL; default 'pending' |
-| `shipping_address_line` | `VARCHAR(200)` | — | NOT NULL |
-| `shipping_city` | `VARCHAR(80)` | — | NOT NULL |
-| `shipping_country` | `VARCHAR(80)` | — | NOT NULL; default 'Vietnam' |
-
-### `order_items`
-
-One book per order. unit_price is the agreed historical price in VND, independent of books.price.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `order_id` | `INT UNSIGNED` | PK, FK → `orders.order_id` | NOT NULL |
-| `book_id` | `INT UNSIGNED` | PK, FK → `books.book_id` | NOT NULL |
-| `quantity` | `INT` | — | NOT NULL |
-| `unit_price` | `DECIMAL(12,2)` | — | NOT NULL; historical sale price, VND |
-
-Composite primary key: `(order_id, book_id)`.
-
-### `reviews`
-
-At most one review per customer and book. Customers may update an existing review.
-
-| Attribute | Type | Keys / reference | Nullability, default and meaning |
-|---|---|---|---|
-| `review_id` | `INT UNSIGNED` | PK, AI | NOT NULL |
-| `customer_id` | `INT UNSIGNED` | FK → `customers.customer_id` | NOT NULL |
-| `book_id` | `INT UNSIGNED` | FK → `books.book_id` | NOT NULL |
-| `rating` | `TINYINT` | — | NOT NULL |
-| `comment` | `TEXT` | — | NOT NULL |
-| `review_date` | `DATETIME` | — | NOT NULL; default CURRENT_TIMESTAMP |
-
-Additional candidate key: `UNIQUE(customer_id, book_id)`; one review per customer/book pair.
-
-## 3. Derived amounts (required subtotal and total)
-
-The brief lists `subtotal` for order lines and `total` for order headers. These
-attributes are present in the reporting views below and are deliberately not
-stored as independently editable columns in the ten normalized base tables.
-This resolves the brief's simultaneous requirements for monetary totals and 3NF
-without storing redundant amounts that can become inconsistent.
-
-| Object | Attributes | Source / formula |
-|---|---|---|
-| `v_order_items` (view) | `order_id`, `book_id`, `quantity`, `unit_price`, **`subtotal`** | All four base fields plus `quantity * unit_price` |
-| `v_orders` (view) | `order_id`, `customer_id`, `order_date`, `status`, `shipping_address_line`, `shipping_city`, `shipping_country`, **`total`** | All order header fields plus `SUM(subtotal)` for that order |
-
-Both monetary results are `DECIMAL(15,2)`. An empty draft order has total `0.00`.
-These views add no tables or stored duplicates. To see the full order information
-including amounts, browse `v_orders` and `v_order_items` in phpMyAdmin. The base
-`orders` and `order_items` tables remain the authoritative data to insert/update.
-
-```sql
-SELECT * FROM v_order_items ORDER BY order_id, book_id;
-SELECT * FROM v_orders ORDER BY order_id;
-```
-
-## 4. Cardinalities and foreign-key actions
-
-| Parent | Child | Child FK | Cardinality | Meaning |
-|---|---|---|---|---|
-| publishers | books | `publisher_id` | 1 : 0..N | Each book has exactly one publisher. |
-| categories (parent) | categories (child) | `parent_category_id` | 0..1 : 0..N | Each category has zero or one parent; a parent has zero or many children. |
-| books | book_authors | `book_id` | 1 : 0..N | Each link belongs to exactly one book. |
-| authors | book_authors | `author_id` | 1 : 0..N | Each link belongs to exactly one author. |
-| books | book_categories | `book_id` | 1 : 0..N | Each link belongs to exactly one book. |
-| categories | book_categories | `category_id` | 1 : 0..N | Each link belongs to exactly one category. |
-| customers | orders | `customer_id` | 1 : 0..N | Each order has exactly one customer. |
-| orders | order_items | `order_id` | 1 : 0..N | A draft may have zero lines; a confirmed order must have at least one. |
-| books | order_items | `book_id` | 1 : 0..N | Each order line refers to exactly one book. |
-| customers | reviews | `customer_id` | 1 : 0..N | Each review has exactly one customer. |
-| books | reviews | `book_id` | 1 : 0..N | Each review has exactly one book. |
-
-All foreign keys use `ON UPDATE CASCADE`. Delete behavior:
-
-- **RESTRICT:** publisher → books; parent category → child categories; customer → orders;
-  book → order_items. Referenced catalog and transaction identities must remain valid.
-- **CASCADE:** book/author → book_authors; book/category → book_categories;
-  order → order_items; customer/book → reviews. Dependent rows have no independent meaning.
-- A nullable root-category parent is intentionally represented by NULL. Parent deletion
-  is restricted, so deleting a category cannot silently detach its sub-genres.
-
-## 5. Why this design satisfies 3NF
-
-### First Normal Form
-
-Each cell holds one value. Authors and categories are rows in junction tables,
-not comma-separated fields. Addresses have separate address-line, city and country
-fields. No repeated author1/author2 or book1/book2 columns exist.
-
-### Second Normal Form
-
-All non-key attributes depend on an entire candidate key. The two book junctions
-contain only their composite keys. In `order_items`, the key is `(order_id, book_id)`;
-quantity and historical unit price describe that book in that particular order.
-A book can sell at different prices in different orders, so `book_id` alone does
-not determine `unit_price`. All other tables use one-column surrogate primary keys.
-
-### Third Normal Form
-
-No non-key fact determines another stored non-key fact within a base table.
-For example, `books` contains `publisher_id`, but the publisher's name, address and
-website belong only to `publishers`. Repeating those details in `books` would create
-`book_id → publisher_id → publisher details`, a transitive dependency.
-The same separation is applied to authors, categories, customers and reviews.
-Calculated subtotals/totals are supplied by views rather than redundant stored fields.
-
-The order shipping address is a historical destination, not the customer's current
-profile address. Order 4 goes to a different address from customer 1's profile.
-The agreed unit price is similarly historical: book 1 currently costs 180,000 VND,
-but order 1 purchased it for 175,000 VND. These are different business facts.
-
-## 6. Constraints and assumptions
-
-- ISBN is unique and must have 13 digits; sample check digits are valid. The database
-  checks the format; the sample-data verification additionally checks the checksum.
-- Publisher and category names are unique; author/customer names need not be unique.
-- Customer email is unique; only salted password hashes are stored. Sample credentials
-  are synthetic with discarded random input passwords; this homework is not a login app.
-- Book price and sale price must be positive; stock cannot be negative; quantity must
-  be positive; review rating is between 1 and 5.
-- Defaults cover zero stock, pending order status, Vietnam and creation timestamps.
-- All ten tables use InnoDB, utf8mb4 and utf8mb4_unicode_ci.
-- Amounts use VND; this model assumes free delivery and no additional tax/discount.
-- Confirmed orders require at least one item as an application workflow rule. A draft
-  can be temporarily empty while a header and its items are inserted in a transaction.
-- Parent categories must form a tree. The FK enforces parent existence, not cycle
-  detection; an application must reject cycles. Sample category data is acyclic.
-- One ISBN denotes one edition. An order contains at most one line per book;
-  ordering multiple copies changes quantity. Reviews are not restricted to verified
-  purchases by the schema; the sample reviews all refer to delivered purchases.
-- All sample identities, books, publishers, addresses and ISBNs are illustrative.
-
-## 7. Sample data and demonstrations
-
-| Table | Required minimum | Included |
-|---|---:|---:|
-| `authors` | 6 | 6 |
-| `publishers` | 4 | 4 |
-| `categories` | 5 | 6 |
-| `books` | 8 | 8 |
-| `book_authors` | Not specified | 12 |
-| `book_categories` | Not specified | 10 |
-| `customers` | 5 | 5 |
-| `orders` | 6 | 6 |
-| `order_items` | 12 | 15 |
-| `reviews` | 10 | 10 |
-
-Examples that demonstrate the relationships:
-
-- **Books ↔ authors:** book 1 has authors 1 and 2; author 2 writes books 1, 2 and 7.
-- **Books ↔ categories:** book 7 belongs to Technology and Business; Technology has
-  books 1, 2 and 7. Book 6 belongs to Children Fiction and Nature.
-- **Category hierarchy:** Non-fiction is parent to Technology, Business and Nature;
-  Fiction is parent to Children Fiction.
-- **Customer ↔ orders:** customer 1 has orders 1 and 4, with different destinations.
-- **Order ↔ books:** order 1 has three different books; book 1 appears in orders 1 and 3.
-- **Reviews:** book 1 has reviews from customers 1 and 3; customer 1 reviews several books.
-- **Useful edge cases:** book 8 currently has zero stock; order 6 is pending;
-  order 5 is shipped; older order prices can differ from current catalog prices.
-
-| Order | Expected total (VND) |
-|---|---:|
-| 1 | 675,000.00 |
-| 2 | 435,000.00 |
-| 3 | 585,000.00 |
-| 4 | 235,000.00 |
-| 5 | 620,000.00 |
-| 6 | 270,000.00 |
-
-## 8. Running the matching SQL
-
-Open phpMyAdmin, select `bookstore_db`, and import `bookstore_db.sql` with UTF-8 encoding.
-On a fresh server, first create an empty `bookstore_db` database with utf8mb4_unicode_ci. The script creates
-`bookstore_db`, ten base tables, two views, all sample records and final checks.
-Re-importing resets these homework tables and views, so back up edits first.
-It never drops another database. The final SELECT statements check row counts and order totals; phpMyAdmin may
-show only its import-success banner. Browse the tables/views to inspect the data.
-Keep this database for Homework 7.
+/*
+ * Students: Hoàng Hòa Bình
+ * Assignment: Homework 6 - Online Bookstore Database Design
+ * Date: 2026-10-18
+ * Files: bookstore_db.sql and bookstore_erd.md
+ * Target: MySQL 8.0.16+ or MariaDB 10.4+ (XAMPP).
+ * Import the whole file in phpMyAdmin using the Import or SQL tab.
+ * Re-running replaces ONLY the ten homework tables and two views in bookstore_db.
+ * Back up any changes to those tables before re-importing.
+ */
+
+/*
+NORMALIZATION TO THIRD NORMAL FORM (3NF)
+1NF: Every field contains one value. Authors and categories are not stored as
+comma-separated lists in books; each association occupies a junction-table row.
+Addresses are split into address line, city and country; an address line is the
+smallest unit needed by this application.
+2NF: book_authors and book_categories contain only their composite primary-key
+columns. In order_items, both quantity and the agreed unit_price depend on the
+whole (order_id, book_id) key, not on just the book or order. All other tables
+have a single-column surrogate PK and any additional candidate keys shown.
+3NF: Non-key attributes describe the key directly. Publisher details occur only
+in publishers: books stores publisher_id but not publisher_name or website.
+Author details and category descriptions occur only in their respective tables.
+Customer profile data is not duplicated in orders. Shipping address fields are
+facts about a particular order destination and need not match the current
+customer address. Likewise order_items.unit_price is a historical transaction
+price, not a copy that must track the current books.price.
+DERIVED MONEY FIELDS REQUIRED BY THE BRIEF:
+An item subtotal equals quantity * unit_price. An order total is the sum of its
+item subtotals. Storing these as independently editable base columns would add
+redundancy and update anomalies. The required subtotal and total are therefore
+exposed as derived attributes in v_order_items and v_orders (defined below).
+All ten required entity tables remain base tables in 3NF; the two read-only
+reporting views add no persisted facts. Query v_orders to see the order header
+including total; query v_order_items to see every line including subtotal.
+BUSINESS ASSUMPTIONS:
+All money is VND, with no delivery fee, tax or discount beyond each agreed unit
+price. An order may temporarily have zero lines while being entered; its total
+is zero. Before confirmation, the application must require at least one line.
+One ISBN identifies one edition. The category hierarchy is a tree by business
+rule; the parent FK ensures existence, while preventing cycles is an application
+validation rule (not claimed to be enforced by the FK). Reviews need not be
+verified purchases, although the sample reviews are all from delivered orders.
+These synthetic authors, publishers, books, addresses, ISBNs and accounts are
+illustrative classroom data, not verified real-world bibliographic records.
+*/
+
+SET NAMES utf8mb4;
+-- Strict input validation for this import session; preserve existing SQL modes.
+SET SESSION sql_mode = CONCAT_WS(',', @@SESSION.sql_mode, 'STRICT_ALL_TABLES');
+CREATE DATABASE IF NOT EXISTS bookstore_db
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE bookstore_db;
+
+-- Remove dependent objects before their parents; FK enforcement stays enabled.
+DROP VIEW IF EXISTS v_orders;
+DROP VIEW IF EXISTS v_order_items;
+DROP TABLE IF EXISTS reviews;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS book_categories;
+DROP TABLE IF EXISTS book_authors;
+DROP TABLE IF EXISTS books;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS publishers;
+DROP TABLE IF EXISTS authors;
+
+-- authors: One row per author; names are not assumed to be unique.
+CREATE TABLE authors (
+author_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    full_name VARCHAR(120) NOT NULL,
+    biography TEXT,
+    nationality VARCHAR(60) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- publishers: Publisher details are stored once and referenced by books.
+CREATE TABLE publishers (
+publisher_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    publisher_name VARCHAR(150) NOT NULL UNIQUE,
+    address_line VARCHAR(200) NOT NULL,
+    city VARCHAR(80) NOT NULL,
+    country VARCHAR(80) NOT NULL DEFAULT 'Vietnam',
+    website VARCHAR(255)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- categories: Optional parent_category_id represents sub-genres; NULL means a root category.
+CREATE TABLE categories (
+category_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    category_name VARCHAR(80) NOT NULL UNIQUE,
+    description TEXT,
+    parent_category_id INT UNSIGNED NULL,
+    -- Do not delete a parent while child categories still refer to it.
+    CONSTRAINT fk_categories_parent FOREIGN KEY (parent_category_id)
+        REFERENCES categories (category_id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- books: One catalog row per ISBN/edition; the catalog price is the current price in VND.
+CREATE TABLE books (
+book_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    isbn VARCHAR(13) NOT NULL UNIQUE,
+    title VARCHAR(200) NOT NULL,
+    publisher_id INT UNSIGNED NOT NULL,
+    price DECIMAL(12,2) NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    publication_date DATE NOT NULL,
+    description TEXT,
+    -- Preserve books that still reference a publisher.
+    CONSTRAINT fk_books_publisher FOREIGN KEY (publisher_id)
+        REFERENCES publishers (publisher_id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_books_isbn CHECK (isbn REGEXP '^[0-9]{13}$'),
+    CONSTRAINT chk_books_price CHECK (price > 0),
+    CONSTRAINT chk_books_stock CHECK (stock >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- book_authors: Resolves books M:N authors. The composite PK prevents duplicate associations.
+CREATE TABLE book_authors (
+book_id INT UNSIGNED NOT NULL,
+    author_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (book_id, author_id),
+    -- Associations have no independent existence after either endpoint is deleted.
+    CONSTRAINT fk_book_authors_book FOREIGN KEY (book_id)
+        REFERENCES books (book_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_book_authors_author FOREIGN KEY (author_id)
+        REFERENCES authors (author_id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- book_categories: Resolves books M:N categories. The composite PK prevents duplicate associations.
+CREATE TABLE book_categories (
+book_id INT UNSIGNED NOT NULL,
+    category_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (book_id, category_id),
+    CONSTRAINT fk_book_categories_book FOREIGN KEY (book_id)
+        REFERENCES books (book_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_book_categories_category FOREIGN KEY (category_id)
+        REFERENCES categories (category_id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- customers: Customer profile and password hash; no plaintext password is stored.
+CREATE TABLE customers (
+customer_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    full_name VARCHAR(120) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    address_line VARCHAR(200) NOT NULL,
+    city VARCHAR(80) NOT NULL,
+    country VARCHAR(80) NOT NULL DEFAULT 'Vietnam',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- orders: Order header. Shipping fields are a snapshot of this order destination, not the current customer address.
+CREATE TABLE orders (
+order_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT UNSIGNED NOT NULL,
+    order_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('pending', 'paid', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'pending',
+    shipping_address_line VARCHAR(200) NOT NULL,
+    shipping_city VARCHAR(80) NOT NULL,
+    shipping_country VARCHAR(80) NOT NULL DEFAULT 'Vietnam',
+    -- Keep customer identity for order history; cancel orders rather than delete history.
+    CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id)
+        REFERENCES customers (customer_id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- order_items: One book per order. unit_price is the agreed historical price in VND, independent of books.price.
+CREATE TABLE order_items (
+order_id INT UNSIGNED NOT NULL,
+    book_id INT UNSIGNED NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(12,2) NOT NULL,
+    PRIMARY KEY (order_id, book_id),
+    -- Items belong to their order; removing an order removes its dependent items.
+    CONSTRAINT fk_order_items_order FOREIGN KEY (order_id)
+        REFERENCES orders (order_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    -- Preserve historical sales lines when a book is referenced.
+    CONSTRAINT fk_order_items_book FOREIGN KEY (book_id)
+        REFERENCES books (book_id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_order_items_quantity CHECK (quantity > 0),
+    CONSTRAINT chk_order_items_unit_price CHECK (unit_price > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- reviews: At most one review per customer and book. Customers may update an existing review.
+CREATE TABLE reviews (
+review_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT UNSIGNED NOT NULL,
+    book_id INT UNSIGNED NOT NULL,
+    rating TINYINT NOT NULL,
+    comment TEXT NOT NULL,
+    review_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_reviews_customer_book UNIQUE (customer_id, book_id),
+    -- Reviews are dependent content, unlike retained order history.
+    CONSTRAINT fk_reviews_customer FOREIGN KEY (customer_id)
+        REFERENCES customers (customer_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_reviews_book FOREIGN KEY (book_id)
+        REFERENCES books (book_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT chk_reviews_rating CHECK (rating BETWEEN 1 AND 5)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Required derived line amount: evaluated on reading, never stored twice.
+CREATE VIEW v_order_items AS
+SELECT order_id, book_id, quantity, unit_price,
+       CAST(quantity * unit_price AS DECIMAL(15,2)) AS subtotal
+FROM order_items;
+
+-- Required derived order total: pre-aggregate items before joining the header.
+CREATE VIEW v_orders AS
+SELECT o.order_id, o.customer_id, o.order_date, o.status,
+       o.shipping_address_line, o.shipping_city, o.shipping_country,
+       CAST(COALESCE(t.total, 0) AS DECIMAL(15,2)) AS total
+FROM orders AS o
+LEFT JOIN (
+    SELECT order_id, SUM(subtotal) AS total
+    FROM v_order_items
+    GROUP BY order_id
+) AS t ON t.order_id = o.order_id;
+
+-- All INSERTs below are committed together. Create parent data before children.
+START TRANSACTION;
+
+-- Sample authors: 6 rows.
+INSERT INTO authors (author_id, full_name, biography, nationality)
+VALUES
+(1, 'Nguyễn Minh An', 'Writes introductory database and programming textbooks.', 'Vietnamese');
+
+INSERT INTO authors (author_id, full_name, biography, nationality)
+VALUES
+(2, 'Trần Thu Hà', 'Teaches data analysis and co-authors technical study guides.', 'Vietnamese');
+
+INSERT INTO authors (author_id, full_name, biography, nationality)
+VALUES
+(3, 'Lê Hoàng Nam', 'Writes practical books about finance and small businesses.', 'Vietnamese');
+
+INSERT INTO authors (author_id, full_name, biography, nationality)
+VALUES
+(4, 'Phạm Ngọc Linh', 'Writes contemporary fiction and travel stories.', 'Vietnamese');
+
+INSERT INTO authors (author_id, full_name, biography, nationality)
+VALUES
+(5, 'Đỗ Quang Huy', 'Writes books about sustainable living and everyday science.', 'Vietnamese');
+
+INSERT INTO authors (author_id, full_name, biography, nationality)
+VALUES
+(6, 'Bùi Mai Phương', 'Writes short stories for children and young readers.', 'Vietnamese');
+
+-- Sample publishers: 4 rows.
+INSERT INTO publishers (publisher_id, publisher_name, address_line, city, country, website)
+VALUES
+(1, 'Tri Thuc Book House', '12 Learning Street', 'Hanoi', 'Vietnam', 'https://trithuc.example.com');
+
+INSERT INTO publishers (publisher_id, publisher_name, address_line, city, country, website)
+VALUES
+(2, 'Sao Mai Publishing', '25 Sunrise Street', 'Ho Chi Minh City', 'Vietnam', 'https://saomai.example.com');
+
+INSERT INTO publishers (publisher_id, publisher_name, address_line, city, country, website)
+VALUES
+(3, 'La Xanh Press', '8 Garden Street', 'Da Nang', 'Vietnam', 'https://laxanh.example.com');
+
+INSERT INTO publishers (publisher_id, publisher_name, address_line, city, country, website)
+VALUES
+(4, 'Cau Vong Books', '40 Rainbow Street', 'Hanoi', 'Vietnam', 'https://cauvong.example.com');
+
+-- Sample categories: 2 rows.
+INSERT INTO categories (category_id, category_name, description, parent_category_id)
+VALUES
+(1, 'Non-fiction', 'Informational and practical books.', NULL);
+
+INSERT INTO categories (category_id, category_name, description, parent_category_id)
+VALUES
+(2, 'Fiction', 'Imaginative stories and novels.', NULL);
+
+-- Sample categories: 4 rows.
+INSERT INTO categories (category_id, category_name, description, parent_category_id)
+VALUES
+(3, 'Technology', 'Programming, databases and data analysis.', 1);
+
+INSERT INTO categories (category_id, category_name, description, parent_category_id)
+VALUES
+(4, 'Business', 'Finance and business skills.', 1);
+
+INSERT INTO categories (category_id, category_name, description, parent_category_id)
+VALUES
+(5, 'Nature', 'Science, environment and sustainable living.', 1);
+
+INSERT INTO categories (category_id, category_name, description, parent_category_id)
+VALUES
+(6, 'Children Fiction', 'Stories for younger readers.', 2);
+
+-- Sample books: 8 rows.
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(1, '9786041234505', 'SQL for Everyday Learning', 1, 180000, 25, '2024-03-15', 'A practical introduction to relational queries.');
+
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(2, '9786041234512', 'Python and Data Stories', 1, 220000, 18, '2024-06-10', 'Learning programming through small datasets.');
+
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(3, '9786041234529', 'Personal Finance for Students', 2, 150000, 30, '2024-08-20', 'Budgeting, saving and responsible financial planning.');
+
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(4, '9786041234536', 'The Lantern by the River', 2, 120000, 12, '2023-11-05', 'A novel about friendship and returning home.');
+
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(5, '9786041234543', 'Small Steps for a Greener Home', 3, 140000, 20, '2025-01-12', 'Practical habits for sustainable living.');
+
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(6, '9786041234550', 'Milo and the Rainbow Garden', 4, 95000, 40, '2024-05-30', 'A story about curiosity and caring for nature.');
+
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(7, '9786041234567', 'Data for Small Businesses', 1, 200000, 10, '2025-02-18', 'Using data to improve everyday business decisions.');
+
+INSERT INTO books (book_id, isbn, title, publisher_id, price, stock, publication_date, description)
+VALUES
+(8, '9786041234574', 'Stories Under the Banyan Tree', 4, 110000, 0, '2025-04-01', 'Short stories for families and young readers.');
+
+-- Sample book_authors: 12 rows.
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(1, 1);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(1, 2);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(2, 1);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(2, 2);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(3, 3);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(4, 4);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(5, 5);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(6, 5);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(6, 6);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(7, 2);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(7, 3);
+
+INSERT INTO book_authors (book_id, author_id)
+VALUES
+(8, 6);
+
+-- Sample book_categories: 10 rows.
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(1, 3);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(2, 3);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(3, 4);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(4, 2);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(5, 5);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(6, 6);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(6, 5);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(7, 3);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(7, 4);
+
+INSERT INTO book_categories (book_id, category_id)
+VALUES
+(8, 6);
+
+-- Sample customers: 5 rows.
+INSERT INTO customers (customer_id, full_name, email, password_hash, address_line, city, country, created_at)
+VALUES
+(1, 'Nguyễn Lan Anh', 'lananh@example.com', 'pbkdf2_sha256$600000$kmNtyx1TykC1vL2rwbLskg==$bprKgASIcBTtAnJaC8K0R6zLfpB1aq+sC9qmdqa4Mio=', '15 Lotus Lane', 'Hanoi', 'Vietnam', '2026-08-01 09:00:00');
+
+INSERT INTO customers (customer_id, full_name, email, password_hash, address_line, city, country, created_at)
+VALUES
+(2, 'Trần Minh Đức', 'minhduc@example.com', 'pbkdf2_sha256$600000$XJeH2ixoD52YbmFN8CqvxQ==$bJzMkhNZAOa78Y0uaK2kGJMOMR9uByCAFyx0yn1wXn0=', '28 Pine Street', 'Da Nang', 'Vietnam', '2026-08-02 10:00:00');
+
+INSERT INTO customers (customer_id, full_name, email, password_hash, address_line, city, country, created_at)
+VALUES
+(3, 'Lê Thu Trang', 'thutrang@example.com', 'pbkdf2_sha256$600000$TtWelkAPs1sZYSsJGixX1Q==$kw8xhtTXvQw5FYBNg82+FOYHR4Rbu6+v4Kwo7aWKEyE=', '9 Bamboo Lane', 'Ho Chi Minh City', 'Vietnam', '2026-08-03 11:00:00');
+
+INSERT INTO customers (customer_id, full_name, email, password_hash, address_line, city, country, created_at)
+VALUES
+(4, 'Phạm Quốc Bảo', 'quocbao@example.com', 'pbkdf2_sha256$600000$XSAXJBxyQlqhYwJ5eb8wog==$AOzPZfLhIYnfZ+mfR/Y6OEpyhurHSN71yUGSWP4ZsZw=', '62 Lake Street', 'Hanoi', 'Vietnam', '2026-08-04 12:00:00');
+
+INSERT INTO customers (customer_id, full_name, email, password_hash, address_line, city, country, created_at)
+VALUES
+(5, 'Hoàng Ngọc Linh', 'ngoclinh@example.com', 'pbkdf2_sha256$600000$lAF/aChloacwNp8aPj1RTw==$zBx7crKhyUT1iMhTm+o0m3fxKpHKO/DSHDJ2QphQSYU=', '33 Orchid Street', 'Hue', 'Vietnam', '2026-08-05 13:00:00');
+
+-- Sample orders: 6 rows.
+INSERT INTO orders (order_id, customer_id, order_date, status, shipping_address_line, shipping_city, shipping_country)
+VALUES
+(1, 1, '2026-09-01 09:15:00', 'delivered', '15 Lotus Lane', 'Hanoi', 'Vietnam');
+
+INSERT INTO orders (order_id, customer_id, order_date, status, shipping_address_line, shipping_city, shipping_country)
+VALUES
+(2, 2, '2026-09-02 10:20:00', 'delivered', '28 Pine Street', 'Da Nang', 'Vietnam');
+
+INSERT INTO orders (order_id, customer_id, order_date, status, shipping_address_line, shipping_city, shipping_country)
+VALUES
+(3, 3, '2026-09-03 14:10:00', 'delivered', '9 Bamboo Lane', 'Ho Chi Minh City', 'Vietnam');
+
+INSERT INTO orders (order_id, customer_id, order_date, status, shipping_address_line, shipping_city, shipping_country)
+VALUES
+(4, 1, '2026-09-06 16:30:00', 'delivered', '20 Campus Road', 'Hanoi', 'Vietnam');
+
+INSERT INTO orders (order_id, customer_id, order_date, status, shipping_address_line, shipping_city, shipping_country)
+VALUES
+(5, 4, '2026-10-15 11:45:00', 'shipped', '62 Lake Street', 'Hanoi', 'Vietnam');
+
+INSERT INTO orders (order_id, customer_id, order_date, status, shipping_address_line, shipping_city, shipping_country)
+VALUES
+(6, 5, '2026-10-18 08:00:00', 'pending', '33 Orchid Street', 'Hue', 'Vietnam');
+
+-- Sample order_items: 15 rows.
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(1, 1, 1, 175000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(1, 2, 1, 210000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(1, 3, 2, 145000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(2, 4, 1, 120000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(2, 5, 1, 135000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(2, 6, 2, 90000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(3, 1, 1, 180000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(3, 7, 1, 195000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(3, 8, 2, 105000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(4, 5, 1, 140000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(4, 6, 1, 95000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(5, 2, 1, 220000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(5, 7, 2, 200000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(6, 3, 1, 150000);
+
+INSERT INTO order_items (order_id, book_id, quantity, unit_price)
+VALUES
+(6, 4, 1, 120000);
+
+-- Sample reviews: 10 rows.
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(1, 1, 1, 5, 'Clear SQL examples and useful exercises.', '2026-09-10 09:00:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(2, 1, 2, 4, 'The small projects made Python easier to understand.', '2026-09-10 09:10:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(3, 1, 3, 5, 'Helpful budgeting examples for students.', '2026-09-10 09:20:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(4, 2, 4, 4, 'A warm story with memorable characters.', '2026-09-11 10:00:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(5, 2, 5, 3, 'Useful ideas, but I wanted more detailed examples.', '2026-09-11 10:10:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(6, 2, 6, 5, 'The children enjoyed the garden adventure.', '2026-09-11 10:20:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(7, 3, 1, 4, 'A good starting point for learning databases.', '2026-09-12 11:00:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(8, 3, 7, 5, 'Practical analysis examples for a small shop.', '2026-09-12 11:10:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(9, 3, 8, 4, 'Short stories that are easy to read together.', '2026-09-12 11:20:00');
+
+INSERT INTO reviews (review_id, customer_id, book_id, rating, comment, review_date)
+VALUES
+(10, 1, 5, 4, 'Simple changes that I can apply at home.', '2026-09-15 08:30:00');
+
+COMMIT;
+
+-- Import checks: ten base tables; two additional views calculate required totals.
+SELECT 'authors' AS table_name, COUNT(*) AS row_count FROM authors
+UNION ALL SELECT 'publishers', COUNT(*) FROM publishers
+UNION ALL SELECT 'categories', COUNT(*) FROM categories
+UNION ALL SELECT 'books', COUNT(*) FROM books
+UNION ALL SELECT 'book_authors', COUNT(*) FROM book_authors
+UNION ALL SELECT 'book_categories', COUNT(*) FROM book_categories
+UNION ALL SELECT 'customers', COUNT(*) FROM customers
+UNION ALL SELECT 'orders', COUNT(*) FROM orders
+UNION ALL SELECT 'order_items', COUNT(*) FROM order_items
+UNION ALL SELECT 'reviews', COUNT(*) FROM reviews;
+
+-- Expected totals in order_id order: 675000, 435000, 585000, 235000, 620000, 270000 VND.
+SELECT order_id, customer_id, status, total FROM v_orders ORDER BY order_id;
