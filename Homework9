@@ -1,0 +1,299 @@
+<?php
+/**
+ * INS3064 - Homework 9: Error Handling and Debugging
+ * Name: Hoang Hoa Binh
+ * Student ID: 23071307
+ * Date: 2026-11-08
+ * PHP 7.4+; no external dependencies.
+ * Logs are stored OUTSIDE the web root (an option explicitly allowed by the brief).
+ * XAMPP: <xampp>/ins3064-homework09-private/calculator_errors.log
+ */
+declare(strict_types=1);
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
+// Convert unexpected PHP warnings/notices into catchable exceptions.
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+class DivisionByZeroException extends Exception {}
+class InvalidOperatorException extends Exception {}
+class InvalidInputException extends Exception {}
+// OverflowException is provided by PHP's SPL; do not redeclare it.
+
+function escapeHtml($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function postedText(string $key): string
+{
+    $value = $_POST[$key] ?? '';
+    return is_string($value) ? $value : '[invalid array input]';
+}
+
+function parseNumber(string $key, string $label): float
+{
+    $value = $_POST[$key] ?? null;
+    if (!is_string($value) || trim($value) === '' || strlen($value) > 128
+        || !is_numeric(trim($value))) {
+        throw new InvalidInputException($label . ' must be a number, such as 12 or -3.5.');
+    }
+    $number = (float) trim($value);
+    if (is_infinite($number) || is_nan($number)) {
+        throw new OverflowException($label . ' is outside the supported numeric range. Use a smaller number.');
+    }
+    return $number;
+}
+
+function calculate(float $a, string $operator, float $b): float
+{
+    if (!in_array($operator, ['+', '-', '*', '/', '%', '**'], true)) {
+        throw new InvalidOperatorException('Choose a supported operator: +, -, *, /, %, or **.');
+    }
+    if (($operator === '/' || $operator === '%') && $b == 0.0) {
+        throw new DivisionByZeroException(
+            $operator === '/' ? 'Cannot divide by zero. Enter a non-zero second number.'
+                : 'Cannot calculate modulo by zero. Enter a non-zero second number.'
+        );
+    }
+    // PHP % converts operands to integers. Reject fractions and out-of-range
+    // casts explicitly, avoiding truncation and float-to-int warnings.
+    if ($operator === '%') {
+        foreach ([$a, $b] as $operand) {
+            if (floor($operand) !== $operand || $operand >= (float) PHP_INT_MAX
+                || $operand < (float) PHP_INT_MIN) {
+                throw new InvalidInputException('Modulo requires whole numbers within the PHP integer range. Try 10 % 3.');
+            }
+        }
+    }
+    // Zero to a negative power is also a division by zero.
+    if ($operator === '**' && $a == 0.0 && $b < 0.0) {
+        throw new DivisionByZeroException('Zero cannot have a negative exponent. Use a non-zero base or a non-negative exponent.');
+    }
+    switch ($operator) {
+        case '+': $result = $a + $b; break;
+        case '-': $result = $a - $b; break;
+        case '*': $result = $a * $b; break;
+        case '/': $result = $a / $b; break;
+        case '%': $result = (int) $a % (int) $b; break;
+        case '**': $result = $a ** $b; break;
+        default: throw new InvalidOperatorException('Please select a valid operator.');
+    }
+    if (is_infinite((float) $result) || is_nan((float) $result)) {
+        throw new OverflowException('The result is too large or is not a finite real number. Try smaller numbers or a different exponent.');
+    }
+    return (float) $result;
+}
+
+function logCaughtError(Throwable $error, string $expression): bool
+{
+    // A .log extension alone does NOT protect a file served by Apache.
+    // Keep the log in a sibling directory of the document root instead.
+    try {
+        $documentRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+        if ($documentRoot === false || $documentRoot === '' || dirname($documentRoot) === $documentRoot) {
+            throw new RuntimeException('A valid document root is required for private logging.');
+        }
+        $directory = dirname($documentRoot) . DIRECTORY_SEPARATOR . 'ins3064-homework09-private';
+        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+            throw new RuntimeException('Cannot create the private log directory.');
+        }
+        // JSON escaping keeps untrusted text on one physical log line.
+        $encoded = json_encode($expression, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        $message = str_replace(["\r", "\n"], ['\\r', '\\n'], $error->getMessage());
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ip = filter_var($ip, FILTER_VALIDATE_IP) ? $ip : 'unknown';
+        $entry = sprintf("[%s] %s: %s | Input: %s | IP: %s\n",
+            date('Y-m-d H:i:s'), get_class($error), $message, $encoded, $ip);
+        return file_put_contents($directory . '/calculator_errors.log', $entry, FILE_APPEND | LOCK_EX) !== false;
+    } catch (Throwable $loggingError) {
+        // Do not let a logging failure expose a stack trace or hide the original error.
+        try {
+            error_log('Homework 9 logging failure: ' . $loggingError->getMessage()
+                . ' | Original: ' . get_class($error) . ': ' . $error->getMessage());
+        } catch (Throwable $ignored) {
+            // The friendly warning below still tells the user logging is unavailable.
+        }
+        return false;
+    }
+}
+
+$operators = ['+' => 'Add (+)', '-' => 'Subtract (-)', '*' => 'Multiply (*)',
+    '/' => 'Divide (/)', '%' => 'Modulo (%)', '**' => 'Power (**)'];
+$first = '';
+$second = '';
+$operator = '+';
+$expression = '';
+$result = null;
+$errorMessage = '';
+$warningMessage = '';
+$caughtError = null;
+$history = [];
+
+try {
+    // Start the session before any HTML output.
+    session_start();
+    if (!isset($_SESSION['history']) || !is_array($_SESSION['history'])) {
+        $_SESSION['history'] = [];
+    }
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        $first = postedText('first_number');
+        $second = postedText('second_number');
+        $operator = postedText('operator');
+        $expression = trim($first) . ' ' . $operator . ' ' . trim($second);
+        $action = $_POST['action'] ?? 'calculate';
+        if ($action === 'clear_history') {
+            $_SESSION['history'] = [];
+            $warningMessage = 'Calculation history cleared. You can start a new calculation.';
+        } elseif ($action === 'calculate') {
+            $a = parseNumber('first_number', 'First number');
+            $b = parseNumber('second_number', 'Second number');
+            $value = calculate($a, $operator, $b);
+            // Required display rule: division has four decimals; others show integers.
+            $result = number_format($value, $operator === '/' ? 4 : 0, '.', '');
+            if ((float) $result == 0.0) {
+                $result = $operator === '/' ? '0.0000' : '0';
+            }
+            if ($operator !== '/' && floor($value) !== $value) {
+                $warningMessage = 'The result is rounded to a whole number for display, as required by this homework.';
+            }
+            $_SESSION['history'][] = [
+                'expression' => $expression,
+                'result' => $result,
+                'timestamp' => date('Y-m-d H:i:s'),
+            ];
+        } else {
+            throw new InvalidInputException('Unknown form action. Please use Calculate or Clear History.');
+        }
+    }
+} catch (InvalidInputException $error) {
+    $caughtError = $error;
+    $errorMessage = $error->getMessage();
+} catch (InvalidOperatorException $error) {
+    $caughtError = $error;
+    $errorMessage = $error->getMessage();
+} catch (DivisionByZeroException $error) {
+    $caughtError = $error;
+    $errorMessage = $error->getMessage();
+} catch (OverflowException $error) {
+    $caughtError = $error;
+    $errorMessage = $error->getMessage();
+} catch (Throwable $error) {
+    $caughtError = $error;
+    $errorMessage = 'Something unexpected went wrong. Please reload the page and try again.';
+}
+if ($caughtError !== null && !logCaughtError($caughtError, $expression)) {
+    $warningMessage = 'The calculation error was handled, but the private log could not be saved. Please ask the administrator to check folder permissions.';
+}
+if (isset($_SESSION['history']) && is_array($_SESSION['history'])) {
+    $history = array_reverse($_SESSION['history']);
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robust Calculator | Homework 9</title>
+    <style>
+        :root { color-scheme: light; font-family: Arial, sans-serif; color: #172332; background: #edf2f6; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 40px 20px; }
+        main { max-width: 850px; margin: auto; }
+        .eyebrow { color: #38556d; font-size: .78rem; letter-spacing: .14em; font-weight: 700; }
+        h1 { font-size: clamp(2rem, 5vw, 2.7rem); margin: 10px 0; letter-spacing: -.04em; }
+        .intro { color: #526171; line-height: 1.65; margin: 0 0 24px; }
+        .card { background: white; border: 1px solid #ced8e2; border-radius: 16px; padding: 26px; margin-bottom: 22px; }
+        .fields { display: grid; grid-template-columns: 1fr 170px 1fr; gap: 16px; }
+        label { display: block; margin-bottom: 9px; font-size: .9rem; font-weight: 700; }
+        input, select { width: 100%; padding: 13px 12px; border: 1px solid #8899aa; border-radius: 7px; font: inherit; background: white; color: inherit; }
+        input:focus, select:focus, button:focus-visible { outline: 3px solid #88bdf5; outline-offset: 2px; }
+        .hint { font-size: .83rem; color: #526171; line-height: 1.6; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+        button { padding: 12px 20px; border: 1px solid #153f65; border-radius: 7px; background: #153f65; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+        button:hover { background: #245880; }
+        button.secondary { background: white; color: #153f65; }
+        button.secondary:hover { background: #edf2f6; }
+        .message { padding: 15px 18px; border: 1px solid; border-radius: 9px; margin-top: 18px; line-height: 1.6; overflow-wrap: anywhere; }
+        .success { color: #125335; background: #e9f7ef; border-color: #79b394; }
+        .error { color: #8c2020; background: #fff0f0; border-color: #d88e8e; }
+        .warning { color: #75540a; background: #fff8dd; border-color: #d2b65f; }
+        .result { font-size: 1.4rem; font-weight: 700; margin-top: 4px; }
+        .history-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        h2 { font-size: 1.2rem; margin: 0; }
+        .count { background: #edf2f6; border-radius: 20px; padding: 5px 10px; font-size: .8rem; white-space: nowrap; }
+        .table-wrap { overflow-x: auto; margin-top: 18px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { color: #526171; font-size: .8rem; }
+        th, td { padding: 13px 9px; border-bottom: 1px solid #e2e8ef; }
+        td { overflow-wrap: anywhere; max-width: 300px; }
+        td:last-child { white-space: nowrap; font-size: .85rem; color: #526171; }
+        .empty { padding: 22px 0 4px; color: #526171; line-height: 1.6; }
+        footer { text-align: center; color: #526171; font-size: .78rem; line-height: 1.7; }
+        @media (max-width: 600px) { body { padding: 24px 12px; } .card { padding: 20px; } .fields { grid-template-columns: 1fr; } button { flex: 1; } }
+    </style>
+</head>
+<body>
+<main>
+    <div class="eyebrow">INS3064 / HOMEWORK 09</div>
+    <h1>Robust Calculator</h1>
+    <p class="intro">Six operations. Clear feedback. A history of your successful calculations.</p>
+    <section class="card" aria-label="Calculator">
+        <form method="post" action="calculator.php">
+            <div class="fields">
+                <div><label for="first_number">First number</label>
+                    <input type="text" inputmode="decimal" id="first_number" name="first_number" maxlength="128" placeholder="e.g. 10" value="<?= escapeHtml($first) ?>"></div>
+                <div><label for="operator">Operator</label>
+                    <select id="operator" name="operator">
+                        <?php if (!array_key_exists($operator, $operators)): ?>
+                            <option value="<?= escapeHtml($operator) ?>" selected>Unsupported: <?= escapeHtml($operator) ?></option>
+                        <?php endif; ?>
+                        <?php foreach ($operators as $symbol => $label): ?>
+                            <option value="<?= escapeHtml($symbol) ?>" <?= $operator === $symbol ? 'selected' : '' ?>><?= escapeHtml($label) ?></option>
+                        <?php endforeach; ?>
+                    </select></div>
+                <div><label for="second_number">Second number</label>
+                    <input type="text" inputmode="decimal" id="second_number" name="second_number" maxlength="128" placeholder="e.g. 3" value="<?= escapeHtml($second) ?>"></div>
+            </div>
+            <p class="hint">Division shows 4 decimal places. Other results display as whole numbers. Modulo accepts whole numbers only.</p>
+            <div class="actions">
+                <button type="submit" name="action" value="calculate">Calculate</button>
+                <button class="secondary" type="submit" name="action" value="clear_history">Clear History</button>
+            </div>
+        </form>
+        <?php if ($result !== null): ?>
+            <div class="message success" role="status"><strong>Calculation successful</strong>
+                <div class="result"><?= escapeHtml($expression) ?> = <?= escapeHtml($result) ?></div></div>
+        <?php endif; ?>
+        <?php if ($errorMessage !== ''): ?>
+            <div class="message error" role="alert"><strong>Unable to calculate</strong><br><?= escapeHtml($errorMessage) ?></div>
+        <?php endif; ?>
+        <?php if ($warningMessage !== ''): ?>
+            <div class="message warning" role="status"><?= escapeHtml($warningMessage) ?></div>
+        <?php endif; ?>
+    </section>
+    <section class="card" aria-labelledby="history-title">
+        <div class="history-heading"><h2 id="history-title">Calculation history</h2><span class="count"><?= count($history) ?> saved</span></div>
+        <?php if ($history === []): ?>
+            <p class="empty">No calculations yet. Your successful results will appear here, newest first.</p>
+        <?php else: ?>
+            <div class="table-wrap"><table>
+                <thead><tr><th scope="col">Expression</th><th scope="col">Result</th><th scope="col">Time (Vietnam)</th></tr></thead>
+                <tbody>
+                <?php foreach ($history as $entry): ?>
+                    <tr><td><?= escapeHtml($entry['expression']) ?></td><td><?= escapeHtml($entry['result']) ?></td><td><?= escapeHtml($entry['timestamp']) ?></td></tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+        <?php endif; ?>
+    </section>
+    <footer>Hoang Hoa Binh · 23070612<br>PHP error handling &amp; session history</footer>
+</main>
+</body>
+</html>
